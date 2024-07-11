@@ -22,6 +22,16 @@ describe("myDAO", function () {
     return { lock, owner, otherAccount, tokenName, tokenSymbol };
   }
 
+  async function createDAOGroup() {
+    const { lock, owner, otherAccount, tokenName, tokenSymbol } = await loadFixture(deploy);
+    const groupId = 1;
+    const groupName = "meu Teste";
+
+    await lock.registerDAOGroup(groupId, groupName);
+
+    return { lock, owner, otherAccount, tokenName, tokenSymbol, groupId, groupName };
+  }
+
   describe("Deployment", function () {
     it("Should set the right unlockTime", async function () {
       const { lock, tokenName } = await loadFixture(deploy);
@@ -39,26 +49,48 @@ describe("myDAO", function () {
   describe("Organization", function () {
     describe("Group", function () {
       it("Should revert if mint an NFT without a group", async function () {
-        const { lock, owner } = await loadFixture(deploy);
+        const { lock, owner, otherAccount } = await loadFixture(deploy);
+
+        await expect(lock.connect(owner).createNft(otherAccount, 'URIteste', 1)).to.revertedWith("DAO group didn't exist");
       });
 
       it("Should revert if NFT 'minter' is not owner", async function () {
         const { lock, otherAccount } = await loadFixture(deploy);
 
-        expect(await lock.connect(otherAccount).createNft(otherAccount, 'teste', 1)).to.be.revertedWith('Just the owner can do this action!')
+        await expect(lock.connect(otherAccount).createNft(otherAccount, 'teste', 1)).to.revertedWith('Just the owner can do this action!')
       });
 
+      it("Should not create a group if msg.sender is not the owner", async function () {
+        const { lock, otherAccount } = await loadFixture(deploy);
+        const groupId = 1;
+        const groupName = "meu Teste";
+
+        await expect(lock.connect(otherAccount).registerDAOGroup(groupId, groupName)).to.be.revertedWith('Just the owner can do this action!');
+      })
+
       it("Should create a group", async function () {
-        const { lock, owner } = await loadFixture(deploy);
+        const { lock } = await loadFixture(deploy);
         const groupId = 1;
         const groupName = "meu Teste";
 
         await lock.registerDAOGroup(groupId, groupName);
 
-        console.log(await lock.daoGroups(2));
-        expect((await lock.daoGroups(1))).to.equal(groupName); //It is returning an array
+        expect(await lock.daoGroups(1)).to.equal(groupName); //It is returning an array
       })
-    })
+
+      it("Should mint an NFT", async function () {
+        const { lock, otherAccount, groupId } = await loadFixture(createDAOGroup);
+
+        const nftId = await lock.tokenCounter();
+        await lock.createNft(otherAccount, 'URI', groupId);
+
+        expect(await lock.ownerOf(nftId)).to.be.equal(otherAccount.address)
+      })
+    });
+
+    describe("Proposals", function () {
+
+    });
   });
 
   // describe("Withdrawals", function () {

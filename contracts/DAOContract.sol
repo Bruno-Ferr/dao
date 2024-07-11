@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-//import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "hardhat/console.sol";
 
 contract DAOContract is ERC721URIStorage {
     //Transfer NFT
@@ -30,7 +30,7 @@ contract DAOContract is ERC721URIStorage {
 
     function createNft(address _to, string memory _tokenURI, uint groupNumber) public onlyOwner returns (uint256) {
         //Necessário verificar se o grupo existe
-        require(bytes(daoGroups[groupNumber].name).length < 1, "DAO group didn't exist");
+        require(bytes(daoGroups[groupNumber].name).length > 0, "DAO group didn't exist");
         uint256 newItemId = tokenCounter;
         _safeMint(_to, newItemId);
         _setTokenURI(newItemId, _tokenURI);
