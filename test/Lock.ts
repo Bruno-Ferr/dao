@@ -32,6 +32,17 @@ describe("myDAO", function () {
     return { lock, owner, otherAccount, tokenName, tokenSymbol, groupId, groupName };
   }
 
+  async function createProposal() {
+    const { lock, owner, otherAccount, tokenName, tokenSymbol, groupId, groupName } = await loadFixture(createDAOGroup);
+    const description = 'Minha proposta X';
+    const proposalId = await lock.proposalsCount()
+
+    await lock.createNft(otherAccount, 'URI', groupId);
+    await lock.connect(otherAccount).createProposal(groupId, description);
+
+    return { lock, owner, otherAccount, tokenName, tokenSymbol, groupId, groupName, proposalId };
+  }
+
   describe("Deployment", function () {
     it("Should set the right unlockTime", async function () {
       const { lock, tokenName } = await loadFixture(deploy);
@@ -89,73 +100,73 @@ describe("myDAO", function () {
     });
 
     describe("Proposals", function () {
+      it("Should revert if DAO didn't exist or has no NFT holders", async function () {
+        const { lock, groupId } = await loadFixture(createDAOGroup);
+        const description = 'Minha proposta X';
 
+        await expect(lock.createProposal(groupId, description)).to.be.revertedWith("DAO group does not exist or has no NFT holders")
+      });
+
+      it("Should revert if msg.sender is not a member from the DAO", async function () {
+        const { lock, groupId, otherAccount } = await loadFixture(createDAOGroup);
+        const description = 'Minha proposta X';
+
+        await lock.createNft(otherAccount, 'URI', groupId);
+
+        await expect(lock.createProposal(groupId, description)).to.be.revertedWith("You are not a member from this DAO")
+      });
+
+      it("Should create a proposal", async function () {
+        const { lock, groupId, otherAccount } = await loadFixture(createDAOGroup);
+        const description = 'Minha proposta X';
+
+        await lock.createNft(otherAccount, 'URI', groupId);
+        await lock.connect(otherAccount).createProposal(groupId, description);
+
+        expect(await lock.isProposalInDAOGroup(groupId, 0)).to.be.true
+      });
+
+      it("Should revert vote if msg.sender is not a member from the DAO", async function () {
+        const { lock, groupId, proposalId } = await loadFixture(createProposal);
+
+        await expect(lock.voteOnProposal(groupId, proposalId, true)).to.be.revertedWith('Address is not eligible to vote in this DAO group');
+      });
+
+      it("Should revert vote if proposal is not in msg.sender DAO", async function () {
+        const { lock, owner, groupId, proposalId } = await loadFixture(createProposal);
+        const secondGroupId = 2;
+        const secondGoupName = "meu Teste2";
+
+        await lock.registerDAOGroup(secondGroupId, secondGoupName);
+        await lock.createNft(owner, 'URI', groupId);
+
+        await expect(lock.voteOnProposal(secondGroupId, proposalId, true)).to.be.revertedWith('Address is not eligible to vote in this DAO group');
+      });
+
+      it("Should revert vote if proposal is already closed", async function () {
+        const { lock, owner, otherAccount, groupId, proposalId } = await loadFixture(createProposal);
+        await lock.connect(otherAccount).voteOnProposal(groupId, proposalId, true);
+
+        await lock.createNft(owner, 'URI', groupId);
+        await lock.connect(owner).voteOnProposal(groupId, proposalId, true);
+
+        await expect(lock.connect(owner).voteOnProposal(groupId, proposalId, true)).to.be.revertedWith('Proposal is closed');
+      });
+
+      it("Should register msg.sender vote", async function () {
+        const { lock, otherAccount, groupId, proposalId } = await loadFixture(createProposal);
+        await lock.connect(otherAccount).voteOnProposal(groupId, proposalId, true);
+
+        const [yesVotes] = await lock.seeProposalVotes(proposalId)
+        expect(Number(yesVotes)).to.be.equal(1);
+      });
+
+      it("Should revert vote if msg.sender try to vote multiple times", async function () {
+        const { lock, otherAccount, groupId, proposalId } = await loadFixture(createProposal);
+        await lock.connect(otherAccount).voteOnProposal(groupId, proposalId, true);
+
+        await expect(lock.connect(otherAccount).voteOnProposal(groupId, proposalId, true)).to.be.revertedWith('You have already voted on this proposal');
+      });
     });
   });
-
-  // describe("Withdrawals", function () {
-  //   describe("Validations", function () {
-  //     it("Should revert with the right error if called too soon", async function () {
-  //       const { lock } = await loadFixture(deployOneYearLockFixture);
-
-  //       await expect(lock.withdraw()).to.be.revertedWith(
-  //         "You can't withdraw yet"
-  //       );
-  //     });
-
-  //     it("Should revert with the right error if called from another account", async function () {
-  //       const { lock, unlockTime, otherAccount } = await loadFixture(
-  //         deployOneYearLockFixture
-  //       );
-
-  //       // We can increase the time in Hardhat Network
-  //       await time.increaseTo(unlockTime);
-
-  //       // We use lock.connect() to send a transaction from another account
-  //       await expect(lock.connect(otherAccount).withdraw()).to.be.revertedWith(
-  //         "You aren't the owner"
-  //       );
-  //     });
-
-  //     it("Shouldn't fail if the unlockTime has arrived and the owner calls it", async function () {
-  //       const { lock, unlockTime } = await loadFixture(
-  //         deployOneYearLockFixture
-  //       );
-
-  //       // Transactions are sent using the first signer by default
-  //       await time.increaseTo(unlockTime);
-
-  //       await expect(lock.withdraw()).not.to.be.reverted;
-  //     });
-  //   });
-
-//     describe("Events", function () {
-//       it("Should emit an event on withdrawals", async function () {
-//         const { lock, unlockTime, lockedAmount } = await loadFixture(
-//           deployOneYearLockFixture
-//         );
-
-//         await time.increaseTo(unlockTime);
-
-//         await expect(lock.withdraw())
-//           .to.emit(lock, "Withdrawal")
-//           .withArgs(lockedAmount, anyValue); // We accept any value as `when` arg
-//       });
-//     });
-
-//     describe("Transfers", function () {
-//       it("Should transfer the funds to the owner", async function () {
-//         const { lock, unlockTime, lockedAmount, owner } = await loadFixture(
-//           deployOneYearLockFixture
-//         );
-
-//         await time.increaseTo(unlockTime);
-
-//         await expect(lock.withdraw()).to.changeEtherBalances(
-//           [owner, lock],
-//           [lockedAmount, -lockedAmount]
-//         );
-//       });
-//     });
-//   });
 });

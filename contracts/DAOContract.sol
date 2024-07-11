@@ -75,7 +75,7 @@ contract DAOContract is ERC721URIStorage {
     }
 
     function checkProposalOutcome(uint256 proposalId) internal {
-      if (proposals[proposalId].yesVotes.length > daoGroups[proposals[proposalId].proposalId].nftHolders.length / 2) {
+      if (proposals[proposalId].yesVotes.length > (daoGroups[proposals[proposalId].proposalId].nftHolders.length / 2) + 1) {
           proposals[proposalId].result = true;
           proposals[proposalId].isOpen = false;
           
@@ -130,6 +130,13 @@ contract DAOContract is ERC721URIStorage {
         voteYes ? proposals[proposalId].yesVotes.push(msg.sender) : proposals[proposalId].noVotes.push(msg.sender);
         
         checkProposalOutcome(proposalId);
+    }
+
+    function seeProposalVotes(uint256 proposalId) view public returns(uint, uint, uint) {
+        uint yes = proposals[proposalId].yesVotes.length;
+        uint no =  proposals[proposalId].noVotes.length;
+        uint votes = yes + no;
+        return(yes, no, votes);
     }
     
     function _isApprovedOrOwner(address spender, uint256 tokenId) internal view returns (bool) {
